@@ -6,11 +6,11 @@ Este é um script para monitoramento e gerenciamento de mensagens deletadas/edit
 
 ### Desenvolvedor
 Desenvolvido por **Rei Ayanami**  
-Baseado no projeto Iris de **KillovSky**.  
+Baseado no projeto Iris de **[KillovSky](https://github.com/KillovSky)**.  
 © 2024 Rei Ayanami. Todos os direitos reservados.
 
 ### Agradecimentos
-Agradecimento ao **KillovSky** pela base de código e tutoriais.
+Agradecimento ao **[KillovSky](https://github.com/KillovSky)** pela base de código e tutoriais.
 
 ### Como Integrar
 Este bot integra-se ao **Bot Hanako-Kun** na versão Iris - [GitHub Iris](https://github.com/KillovSky/iris), e suporta a execução deste arquivo.
