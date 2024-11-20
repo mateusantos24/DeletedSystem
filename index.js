@@ -207,6 +207,7 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
             case 'conversation':
             case 'extendedTextMessage': {
                 addMessage(user, id, body, false, false, false, false, false, false, false);
+                break;
             }
             }
 
