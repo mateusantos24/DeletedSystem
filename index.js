@@ -256,7 +256,7 @@ function resetAmbient(changeKey = {}) {
                 [envInfo.exports.exec]: envInfo.functions.exec.value,
             },
             Developer: 'Rei Ayanami',
-            Projects: 'https://github.com/KillovSky',
+            Projects: 'https://github.com/maradona4/DeletedSystem',
         };
 
         envInfo.results.success = true;
