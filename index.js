@@ -92,9 +92,6 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
             let result;
             let tiposValidosRegExp = /^(application\/(pdf|msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet|zip|x-rar-compressed|x-7z-compressed|x-tar|gzip|vnd\.oasis\.opendocument\.(text|spreadsheet|presentation)|epub\+zip|json|rtf|octet-stream)|text\/(plain|csv|markdown|html)|application\/javascript)$/;
 
-            console.log(type, FileNameDoc);
-            console.log(quoteThis.message?.documentWithCaptionMessage);
-            console.log(quoteThis.message?.documentWithCaptionMessage?.message);
             switch (type) {
             // Anti editado
             case 'editedMessage': {
