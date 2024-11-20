@@ -145,7 +145,7 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
                     baileysMessage.text = `*⚠️ ALERTA DAS FIGURINHAS 👾*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ FOI APAGADA E DETECTADA*\n> ${message || captionMessage || ''}`;
                 } else if (tipos === 'audio/mp4') {
                     await kill.sendMessage(monitorID, { audio: upload, mimetype: tipos, ptt: false });
-                    await Indexer('others').sleep(1000); // Intervalo de 1 segundo entre audio, risco de banimento por duplicação no WhatsAp
+                    await Indexer('others').sleep(1000); // Intervalo de 1 segundo entre Sticker, risco de banimento por duplicação no WhatsAp
                     baileysMessage.text = `*⚠️ ALERTA DO ÁUDIO 🔊*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ ÁUDIO FOI APAGADO E DETECTADO*\n> ${message || captionMessage || ''}`;
                 } else if (tipos === 'vCard') {
                     // Extração do nome a partir da vCard
@@ -162,7 +162,7 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
                         + `TEL;type=CELL;type=VOICE;waid=${phoneNumber}\n`
                         + 'END:VCARD';
                     await kill.sendMessage(monitorID, { contacts: { displayName: displayName, contacts: [{ vcard }] } });
-                    await Indexer('others').sleep(1000); // Intervalo de 1 segundo entre audio, risco de banimento por duplicação no WhatsAp
+                    await Indexer('others').sleep(1000); // Intervalo de 1 segundo entre vCard, risco de banimento por duplicação no WhatsAp
                     baileysMessage.text = `*⚠️ ALERTA DO CONTATO 🔊*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ CONTATO FOI APAGADO E DETECTADO*\n> ${message || captionMessage || ''}`;
                 } else if (tiposValidosRegExp.test(tipos)) {
                     baileysMessage.document = upload;
