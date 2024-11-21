@@ -96,8 +96,6 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
                 name,
                 time,
                 mimetype,
-                isOwner,
-                messageKeys,
             } = data;
             const isMediaMessage = quoteThis?.message?.stickerMessage || quoteThis?.message?.imageMessage || quoteThis?.message?.videoMessage || quoteThis?.message?.audioMessage || quoteThis?.message?.documentWithCaptionMessage?.message?.documentMessage || quoteThis?.message?.documentMessage;
             const isVisu = quoteThis.message?.viewOnceMessageV2?.message?.videoMessage || quoteThis.message?.viewOnceMessage?.message?.videoMessage || quoteThis?.message?.viewOnceMessageV2?.message?.imageMessage || quoteThis.message?.viewOnceMessage?.message?.imageMessage || false;
@@ -158,11 +156,12 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
                 if (result) {
                     // eslint-disable-next-line no-unused-vars
                     const { message, captionMessage, oldBody, tipos, upload, status, doctitle } = result;
-                    if (tipos === 'video/mp4') {
+                    if (tipos === 'video/mp4' || tipos === 'video/webm' || tipos === 'video/ogg' || tipos === 'video/3gpp' || tipos === 'video/avi' || tipos === 'video/mkv' || tipos === 'video/flv' || tipos === 'video/quicktime') {
+                        baileysMessage.viewOnce = false;
                         baileysMessage.video = upload;
                         baileysMessage.caption = `*⚠️ ALERTA DO VÍDEO 🎬*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ VÍDEO FOI APAGADO E DETECTADO*\n> ${message || captionMessage || ''}`;
                         baileysMessage.mimetype = tipos;
-                    } else if (tipos === 'image/jpeg') {
+                    } else if (tipos === 'image/jpeg' || tipos === 'image/png' || tipos === 'image/gif') {
                         baileysMessage.viewOnce = false;
                         baileysMessage.image = upload;
                         baileysMessage.caption = `*⚠️ ALERTA DA IMAGEM 🖼*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ IMAGEM FOI APAGADA E DETECTADA*\n> ${message || captionMessage || ''}`;
@@ -171,7 +170,7 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
                         await kill.sendMessage(monitorID, { sticker: upload });
                         await Indexer('others').sleep(1000); // Intervalo de 1 segundo entre stickers, risco de banimento por duplicação no WhatsAp
                         baileysMessage.text = `*⚠️ ALERTA DAS FIGURINHAS 👾*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ FOI APAGADA E DETECTADA*\n> ${message || captionMessage || ''}`;
-                    } else if (tipos === 'audio/mp4') {
+                    } else if (tipos === 'audio/mp4' || tipos === 'audio/mpeg' || tipos === 'audio/ogg; codecs=opus' || tipos === 'audio/wav' || tipos === 'audio/flac' || tipos === 'audio/webm') {
                         await kill.sendMessage(monitorID, { audio: upload, mimetype: tipos, ptt: false });
                         await Indexer('others').sleep(1000); // Intervalo de 1 segundo entre audio, risco de banimento por duplicação no WhatsAp
                         baileysMessage.text = `*⚠️ ALERTA DO ÁUDIO 🔊*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ ÁUDIO FOI APAGADO E DETECTADO*\n> ${message || captionMessage || ''}`;
