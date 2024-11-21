@@ -237,14 +237,14 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
             }
             case 'conversation':
             case 'extendedTextMessage': {
-                addMessage(user, id, body, false, false, false, false, false, false, false);
+                addMessage(user, id, body, Msg, false, false, false, false, false, false);
                 break;
             }
             }
 
             // Avisa que uma mensagem foi deletada Notificar alerta
             if (alertaLog) {
-                await kill.sendMessage(monitorID, baileysMessage);
+                await kill.sendMessage(monitorID, baileysMessage, { quoted: quoteThis });
                 alertaLog = false;
             }
         }
