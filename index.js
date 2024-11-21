@@ -105,11 +105,8 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
             const userNames = Indexer('sql').get('personal', mentionUser, chatId).value;
             const checkName = userNames === 'default' || !userNames.name.text.trim() ? pushname : userNames.name.text.trim();
             const Msg = quoteThis?.message?.documentWithCaptionMessage?.message?.documentMessage?.caption || quoteThis?.message?.documentMessage?.caption || quoteThis?.message?.videoMessage?.caption || quoteThis?.message?.imageMessage?.caption || quoteThis?.message?.extendedTextMessage?.text || quoteThis.message?.conversation || '';
-            const TypeFound = quoteThis?.message;
 
-            // Verifica se a mensagem contém 'senderKeyDistributionMessage' ou 'messageContextInfo'
-            const tipos = (quoteThis?.message?.senderKeyDistributionMessage || quoteThis?.message?.messageContextInfo) ? (TypeFound === 'conversation' ? 'conversation' : (TypeFound === 'extendedTextMessage' ? 'extendedTextMessage' : 'conversation')) : type; // Caso contrário, usa o valor original de 'type'
-
+            const tipos = quoteThis?.message?.extendedTextMessage ? 'extendedTextMessage' : quoteThis?.message?.conversation ? 'conversation' : type;
             const editarID = quoteThis?.message?.editedMessage?.message?.protocolMessage?.key?.id || quoteThis?.message?.protocolMessage?.key?.id || '';
             const FileNameDoc = quoteThis?.message?.documentWithCaptionMessage?.message?.documentMessage?.fileName || quoteThis?.message?.documentMessage?.fileName || false;
             const contactCard = quoteThis.message?.contactMessage?.vcard ? quoteThis.message.contactMessage.vcard : false;
