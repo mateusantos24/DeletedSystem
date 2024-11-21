@@ -65,10 +65,12 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
             const remoteUtils = response.data;
             if (outUpdate !== remoteUtils.updated && lastCheckedVersion !== remoteUtils.updated) {
                 console.log('\x1b[91m%s\x1b[0m', `[DELETE SYSTEM] \x1b[33mNOVA VERSÃO FOI LANÇADA!\x1b[0m \x1b[36m(Local: ${outUpdate}) (Novas: ${remoteUtils.updated})\x1b[0m`);
+                console.log('\x1b[91m%s\x1b[0m', '[DELETE SYSTEM] \x1b[36mAcesse a nova versão no GitHub: \x1b[33mhttps://github.com/maradona4/DeletedSystem');
                 console.log('\x1b[91m%s\x1b[0m', '[DELETE SYSTEM] Atualize seu sistema para a versão mais recente para evitar problemas.');
                 lastCheckedVersion = remoteUtils.updated;
-            } else if (outUpdate === remoteUtils.updated) {
+            } else if (outUpdate === remoteUtils.updated && lastCheckedVersion !== remoteUtils.updated) {
                 console.log('\x1b[92m%s\x1b[0m', '[DELETE SYSTEM] Parabéns, sua versão está atualizada!');
+                lastCheckedVersion = remoteUtils.updated;
             }
         } catch (error) {
             console.error('[ERRO]: Não foi possível verificar as atualizações!', error);
