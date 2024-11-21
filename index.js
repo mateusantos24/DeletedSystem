@@ -105,8 +105,8 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
             const userNames = Indexer('sql').get('personal', mentionUser, chatId).value;
             const checkName = userNames === 'default' || !userNames.name.text.trim() ? pushname : userNames.name.text.trim();
             const Msg = quoteThis?.message?.documentWithCaptionMessage?.message?.documentMessage?.caption || quoteThis?.message?.documentMessage?.caption || quoteThis?.message?.videoMessage?.caption || quoteThis?.message?.imageMessage?.caption || quoteThis?.message?.extendedTextMessage?.text || quoteThis.message?.conversation || '';
+            const tipos = quoteThis?.message?.extendedTextMessage ? 'extendedTextMessage' : quoteThis?.message?.conversation ? 'conversation' : quoteThis?.message?.viewOnceMessageV2 ? 'viewOnceMessageV2' : quoteThis?.message?.viewOnceMessage ? 'viewOnceMessage' : quoteThis?.message?.stickerMessage ? 'stickerMessage' : quoteThis?.message?.imageMessage ? 'imageMessage' : quoteThis?.message?.videoMessage ? 'videoMessage' : quoteThis?.message?.audioMessage ? 'audioMessage' : quoteThis?.message?.documentMessage ? 'documentMessage' : type;
 
-            const tipos = quoteThis?.message?.extendedTextMessage ? 'extendedTextMessage' : quoteThis?.message?.conversation ? 'conversation' : type;
             const editarID = quoteThis?.message?.editedMessage?.message?.protocolMessage?.key?.id || quoteThis?.message?.protocolMessage?.key?.id || '';
             const FileNameDoc = quoteThis?.message?.documentWithCaptionMessage?.message?.documentMessage?.fileName || quoteThis?.message?.documentMessage?.fileName || false;
             const contactCard = quoteThis.message?.contactMessage?.vcard ? quoteThis.message.contactMessage.vcard : false;

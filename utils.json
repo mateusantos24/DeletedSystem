@@ -1,7 +1,7 @@
 {
     "name": "antidelete",
     "description": "Executar Anti-Delete: As mensagens e outras atividades serão monitoradas.",
-    "updated": 14,
+    "updated": 15,
     "usage": {
         "general": "[RESTRITO] - Verifique o 'examples' para usos inseguros.",
         "examples": [
