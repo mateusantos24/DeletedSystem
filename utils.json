@@ -1,7 +1,7 @@
 {
     "name": "antidelete",
     "description": "Executar Anti-Delete: As mensagens e outras atividades serão monitoradas.",
-    "updated": "1.1.1",
+    "updated": "1.1.2",
     "usage": {
         "general": "[RESTRITO] - Verifique o 'examples' para usos inseguros.",
         "examples": [
