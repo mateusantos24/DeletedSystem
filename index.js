@@ -155,9 +155,8 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
 
             // Anti Deletado
             case 'protocolMessage': {
-                console.log(tipos);
+
                 result = await checkDeletedMessage(mentionUser, editarID);
-                console.log(result);
                 if (result) {
                     // eslint-disable-next-line no-unused-vars
                     const { message, captionMessage, oldBody, tipos, upload, status, doctitle } = result;
