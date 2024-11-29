@@ -59,28 +59,31 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
 
     // URL do arquivo utils.json no GitHub
     const remoteUtilsURL = 'https://raw.githubusercontent.com/maradona4/DeletedSystem/main/utils.json';
-
     async function checkForUpdates() {
         try {
-            const response = await axios.get(remoteUtilsURL);
+            const response = await axios.get(remoteUtilsURL, { timeout: 1000 });
             const remoteUtils = response.data;
 
-            // Verifica se a versão local é diferente da versão remota
             if (outUpdate !== remoteUtils.updated && lastCheckedVersion !== remoteUtils.updated) {
                 console.log('\x1b[91m%s\x1b[0m', `[DELETE SYSTEM] \x1b[33mNOVA VERSÃO FOI LANÇADA!\x1b[0m \x1b[36m(Local: ${outUpdate}) (Novas: ${remoteUtils.updated})\x1b[0m`);
                 console.log('\x1b[91m%s\x1b[0m', '[DELETE SYSTEM] \x1b[36mAcesse a nova versão no GitHub: \x1b[33mhttps://github.com/maradona4/DeletedSystem');
                 console.log('\x1b[91m%s\x1b[0m', '[DELETE SYSTEM] Atualize seu sistema para a versão mais recente para evitar problemas.');
-                lastCheckedVersion = remoteUtils.updated; // Atualiza a versão verificada
+                lastCheckedVersion = remoteUtils.updated;
             } else if (outUpdate === remoteUtils.updated && lastCheckedVersion !== remoteUtils.updated) {
                 console.log('\x1b[92m%s\x1b[0m', '[DELETE SYSTEM] Parabéns, sua versão está atualizada!');
-                lastCheckedVersion = remoteUtils.updated; // Atualiza a versão verificada
+                lastCheckedVersion = remoteUtils.updated;
             }
         } catch (error) {
-            console.error('[ERRO]: Não foi possível verificar as atualizações!', error);
+            if (error.code === 'ETIMEDOUT') {
+                console.error('\x1b[91m%s\x1b[0m', '[DELETE SYSTEM] Verifique sua conexão com a internet e tente novamente.');
+            } else if (error.code === 'ENOTFOUND') {
+                console.error('\x1b[91m%s\x1b[0m', '[DELETE SYSTEM] URL não encontrada. Verifique se o link está correto.');
+            } else {
+                console.error('\x1b[91m%s\x1b[0m', '[DELETE SYSTEM] Um erro inesperado ocorreu ao verificar atualizações:', error.message);
+            }
         }
     }
-
-    if (!monitorID || monitorID.length === 0) return console.warn('[ANTI-DELETED AVISO]: O valor de "monitorLOG" está vazio. Certifique-se de definir um valor antes de continuar.');
+    if (!monitorID || monitorID.length === 0) return console.warn('[ANTI-DELETED AVISO]: O valor de "monitorID" está vazio. Certifique-se de definir um valor antes de continuar.');
 
     try {
         /* Se recebeu tudo corretamente, se der ruim, não fará nada */
@@ -152,7 +155,9 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
 
             // Anti Deletado
             case 'protocolMessage': {
-                result = await checkDeletedMessage(user, editarID);
+                console.log(tipos);
+                result = await checkDeletedMessage(mentionUser, editarID);
+                console.log(result);
                 if (result) {
                     // eslint-disable-next-line no-unused-vars
                     const { message, captionMessage, oldBody, tipos, upload, status, doctitle } = result;
