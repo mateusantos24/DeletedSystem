@@ -25,7 +25,6 @@ Cole o seguinte código:
 */
 
 const fs = require('fs');
-const axios = require('axios');
 
 const { downloadMediaMessage } = require('baileys');
 
@@ -49,40 +48,11 @@ function ambientDetails() {
 // Função do SQLITE3
 const { addMessage, checkDeletedMessage } = require('./Cache/delete');
 
-let lastCheckedVersion = null;
-
 async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, data = envInfo.functions.exec.arguments.data.value) {
     envInfo.results.value = false;
     envInfo.results.success = false;
     const monitorID = envInfo.parameters.monitorID.value;
-    const outUpdate = envInfo.updated;
 
-    // URL do arquivo utils.json no GitHub
-    const remoteUtilsURL = 'https://raw.githubusercontent.com/maradona4/DeletedSystem/main/utils.json';
-    async function checkForUpdates() {
-        try {
-            const response = await axios.get(remoteUtilsURL, { timeout: 1000 });
-            const remoteUtils = response.data;
-
-            if (outUpdate !== remoteUtils.updated && lastCheckedVersion !== remoteUtils.updated) {
-                console.log('\x1b[91m%s\x1b[0m', `[DELETE SYSTEM] \x1b[33mNOVA VERSÃO FOI LANÇADA!\x1b[0m \x1b[36m(Local: ${outUpdate}) (Novas: ${remoteUtils.updated})\x1b[0m`);
-                console.log('\x1b[91m%s\x1b[0m', '[DELETE SYSTEM] \x1b[36mAcesse a nova versão no GitHub: \x1b[33mhttps://github.com/maradona4/DeletedSystem');
-                console.log('\x1b[91m%s\x1b[0m', '[DELETE SYSTEM] Atualize seu sistema para a versão mais recente para evitar problemas.');
-                lastCheckedVersion = remoteUtils.updated;
-            } else if (outUpdate === remoteUtils.updated && lastCheckedVersion !== remoteUtils.updated) {
-                console.log('\x1b[92m%s\x1b[0m', '[DELETE SYSTEM] Parabéns, sua versão está atualizada!');
-                lastCheckedVersion = remoteUtils.updated;
-            }
-        } catch (error) {
-            if (error.code === 'ETIMEDOUT') {
-                console.error('\x1b[91m%s\x1b[0m', '[DELETE SYSTEM] Verifique sua conexão com a internet e tente novamente.');
-            } else if (error.code === 'ENOTFOUND') {
-                console.error('\x1b[91m%s\x1b[0m', '[DELETE SYSTEM] URL não encontrada. Verifique se o link está correto.');
-            } else {
-                console.error('\x1b[91m%s\x1b[0m', '[DELETE SYSTEM] Um erro inesperado ocorreu ao verificar atualizações:', error.message);
-            }
-        }
-    }
     if (!monitorID || monitorID.length === 0) return console.warn('[ANTI-DELETED AVISO]: O valor de "monitorID" está vazio. Certifique-se de definir um valor antes de continuar.');
 
     try {
@@ -100,6 +70,8 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
                 time,
                 mimetype,
             } = data;
+            if (user === 'status@broadcast') return;
+            if (user?.includes('@lid')) return;
             const isMediaMessage = quoteThis?.message?.stickerMessage || quoteThis?.message?.imageMessage || quoteThis?.message?.videoMessage || quoteThis?.message?.audioMessage || quoteThis?.message?.documentWithCaptionMessage?.message?.documentMessage || quoteThis?.message?.documentMessage;
             const isVisu = quoteThis.message?.viewOnceMessageV2?.message?.videoMessage || quoteThis.message?.viewOnceMessage?.message?.videoMessage || quoteThis?.message?.viewOnceMessageV2?.message?.imageMessage || quoteThis.message?.viewOnceMessage?.message?.imageMessage || false;
             if (isVisu) {
@@ -155,7 +127,6 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
 
             // Anti Deletado
             case 'protocolMessage': {
-
                 result = await checkDeletedMessage(mentionUser, editarID);
                 if (result) {
                     // eslint-disable-next-line no-unused-vars
@@ -256,7 +227,6 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
     } catch (error) {
         console.log(error);
     }
-    checkForUpdates();
     return postResults(envInfo.results);
 }
 
