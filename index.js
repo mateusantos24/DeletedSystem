@@ -1,29 +1,3 @@
-/* Desenvolvido por Rei Ayanami
-Script para monitoramento e gerenciamento de mensagens deletadas/editadas no WhatsApp usando o Baileys.
-Integração com o Bot Hanako-Kun na versão da Iris - https://github.com/KillovSky/iris (suporta este arquivo executado.)
-© 2024 Rei Ayanami. Todos os direitos reservados.
-Agradecimentos ao KillovSky pela base de código e tutoriais.
-
-# AVISO
-PAGINA (1)
-Imagem tutorial: https://i.ibb.co/cc46vd9/Captura-de-tela-2024-11-20-015953.png
-Vá até o arquivo "Bot/lib/Commands/Main/Construct/index.js"
-Na linha 934, cole o seguinte código: await Indexer('deleted').execute(kill, messageData);
-
-PAGINA (2)
-imagem tutorial https://i.ibb.co/jrthttS/Captura-de-tela-2024-11-20-020427.png
-Vá até o arquivo "Bot/lib/Databases/Configurations/symlinks.json"
-Cole o seguinte código:
-"Deleted": {
-    "place": "./Commands/Main/Deleted",
-    "alias": [
-        "deleted",
-        "antidelete",
-        "deletado"
-    ]
-}
-*/
-
 const fs = require('fs');
 const { downloadMediaMessage, downloadContentFromMessage } = require('baileys');
 
@@ -100,7 +74,7 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
                 isVisu.viewOnce = false;
             }
             const quotedMsgBuffer = quoteThis?.message?.extendedTextMessage?.contextInfo?.quotedMessage;
-            const imageMessage = quotedMsgBuffer?.imageMessage || quotedMsgBuffer?.viewOnceMessageV2?.message?.imageMessage;
+            const imageMessage = quotedMsgBuffer?.imageMessage || quotedMsgBuffer?.viewOnceMessageV2?.message?.imageMessage || quotedMsgBuffer?.ephemeralMessage?.message?.viewOnceMessageV2?.message?.imageMessage;
             let decryptedMediaView = '';
             if (imageMessage) {
                 try {
@@ -134,15 +108,17 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
             var baileysMessage = {};
             let alertaLog = false;
             let DeleteMessage;
-            if (quotedMsgObj?.viewOnce) {
+            const isVisualizacao = quotedMsgObj?.viewOnce || quotedMsgObj?.message?.imageMessage?.viewOnce;
+            if (isVisualizacao) {
+                const mediaData = quotedMsgObj?.message?.imageMessage;
                 addVisualizacao(mentionID, decryptedMediaView, false);
-                addMessage(user, mentionID, quotedMsgObj?.caption, quotedMsgObj?.mimetype, 5);
+                addMessage(user, mentionID, mediaData?.caption, mediaData?.mimetype, 5);
             }
             switch (type) {
             // Anti Deletado
             case 'protocolMessage': {
                 DeleteMessage = await checkDeletedMessage(mentionUser, editarID);
-                // console.log(DeleteMessage); // Debug 
+                // console.log(DeleteMessage);
                 const cmdColor = config.colorSet.value[2]; // red 2
                 if (!DeleteMessage) return console.log(Indexer('color').echo('[ANTI-DELETED] ' + checkName + ' (' + mentionUser.replace('@s.whatsapp.net', '') + ') A mensagem deletada não foi encontrada e será ignorada...', cmdColor).value);
                 const UserDelete = DeleteMessage?.user;
@@ -156,16 +132,16 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
                     + '╚═══════════════════════════════════════════════╝', cmdColor).value);
                 switch (DeleteMessage?.status) {
                 case 0: { // Mensagens de texto
-                    baileysMessage.text = '🚨 *EITA, MENSAGEM DELETADA!* 🚨\n\n'
-                    + '👀 Achou que dava pra apagar na miúda, né? Pegamos no pulo!\n\n'
-                    + '🙋‍♂️ *Autor:* ' + checkName + ' (' + mentionUser.replace('@s.whatsapp.net', '') + ')\n'
-                    + '👥 *Grupo:* ' + name + '\n'
-                    + '📅 *Quando mandou:* ' + new Date(DeleteMessage.time).toLocaleString() + '\n'
-                    + '🕵️ *Detectado agora:* ' + time + '\n\n'
+                    baileysMessage.text = '🤣 *FLAGRA! TENTOU APAGAR, MAS JÁ ERA!* 🤣\n\n'
+                    + '😏 Te peguei, malandro! Aqui é zap com histórico eterno.\n\n'
+                    + `🙋‍♂️ *Autor:* ${checkName} (${mentionUser.replace('@s.whatsapp.net', '')})\n`
+                    + `👥 *Grupo:* ${name}\n`
+                    + `📅 *Quando mandou:* ${new Date(DeleteMessage.time).toLocaleString()}\n`
+                    + `🕒 *Detectado agora:* ${time}\n\n`
                     + deletedInfo
-                    + '💬 *Mensagem recuperada:*\n'
-                    + '> ' + TextDelete + '\n\n'
-                    + '😎 Tenta apagar de novo, vai... Já foi tarde!';
+                    + '💬 *Mensagem ressuscitada:*\n'
+                    + `> ${TextDelete}\n\n`
+                    + '😎 Quer apagar de novo? Tenta mais sorte na próxima!';
                     break;
                 }
                 case 1: { // Mensagens de imagem
@@ -193,16 +169,15 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
                 case 3: { // Mensagens de Stickers
                     await kill.sendMessage(monitorID, { sticker: mediaDataDelete?.uploaded, mimetype: mediaDataDelete.mimetype });
                     await Indexer('others').sleep(1000);
-                    baileysMessage.text = '🚨 *ALERTA DE STICKER DELETADO* 🚨\n\n'
-                    + '👀 Pegamos no flagra!\n'
-                    + `🔹 *Grupo:* ${name}\n`
-                    + `🔹 *Membro:* ${checkName} (${UserDelete.replace('@s.whatsapp.net', '')})\n`
-                    + `📅 *Enviado em:* ${new Date(DeleteMessage.time).toLocaleString()}\n`
-                    + `🕵️‍♂️ *Detectado:* ${time}\n\n`
+                    baileysMessage.text = '🕵️‍♂️ *STICKER DELETADO? A GENTE VIU!* 🕵️‍♂️\n\n'
+                    + '🚨 Cê tentou apagar um sticker... mas o FBI do Zap tá online!\n\n'
+                    + `📍 *Grupo:* ${name}\n`
+                    + `👤 *Suspeito:* ${checkName} (${UserDelete.replace('@s.whatsapp.net', '')})\n`
+                    + `📅 *Data do crime:* ${new Date(DeleteMessage.time).toLocaleString()}\n`
+                    + `🔎 *Descoberto às:* ${time}\n\n`
                     + `📁 Tamanho: ${formatBytes(mediaDataDelete.uploaded.length)}\n`
                     + `📦 Mimetype: ${mediaDataDelete.mimetype}\n\n`
-                    + deletedInfo
-                    + 'Não adianta apagar... já vimos! 😜\n'
+                    + '📂 Arquivado com sucesso... mas sem perdão! 😈\n'
                     + `> ${TextDelete}`;
                     break;
                 }
@@ -251,7 +226,7 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
                 case 6: { // Mensagens de áudio
                     await kill.sendMessage(monitorID, { audio: mediaDataDelete?.uploaded, mimetype: mediaDataDelete.mimetype });
                     await Indexer('others').sleep(1000);
-                    baileysMessage.caption = '🎵 *ÁUDIO DELETADO DETECTADO!* 🎵\n\n'
+                    baileysMessage.text = '🎵 *ÁUDIO DELETADO DETECTADO!* 🎵\n\n'
                     + '🎙️ Tentou mandar aquele áudio e apagar rapidinho? HA! Pegamos! 😂\n\n'
                     + '🙋‍♂️ *Autor:* ' + checkName + ' (' + UserDelete.replace('@s.whatsapp.net', '') + ')\n'
                     + '👥 *Grupo:* ' + name + '\n'
