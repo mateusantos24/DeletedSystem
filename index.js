@@ -142,7 +142,7 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
             // Anti Deletado
             case 'protocolMessage': {
                 DeleteMessage = await checkDeletedMessage(mentionUser, editarID);
-                console.log(DeleteMessage);
+                // console.log(DeleteMessage); // Debug 
                 const cmdColor = config.colorSet.value[2]; // red 2
                 if (!DeleteMessage) return console.log(Indexer('color').echo('[ANTI-DELETED] ' + checkName + ' (' + mentionUser.replace('@s.whatsapp.net', '') + ') A mensagem deletada não foi encontrada e será ignorada...', cmdColor).value);
                 const UserDelete = DeleteMessage?.user;
