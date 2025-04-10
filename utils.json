@@ -1,7 +1,7 @@
 {
     "name": "antidelete",
     "description": "Executar Anti-Delete: As mensagens e outras atividades serão monitoradas.",
-    "updated": "1.1.5",
+    "updated": "1.1.6",
     "usage": {
         "general": "[RESTRITO] - Verifique o 'examples' para usos inseguros.",
         "examples": [
@@ -141,6 +141,16 @@
             "description": "define o número 123456789@g.us, que será enviado como evento. Grupos (g.us) / Privado (s.whatsapp.net)",
             "type": "Object",
             "value": ""
+        },
+        "memoryVideo": {
+            "description": "Limite de vídeo 16MB, valor pode ser editado",
+            "type": "String",
+            "value": "16"
+        },
+        "messageText": {
+            "description": "Limite máximo de caracteres em mensagens de texto",
+            "type": "String",
+            "value": "10000"
         }
     },
     "results": {

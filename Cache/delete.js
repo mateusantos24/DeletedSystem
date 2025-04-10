@@ -14,95 +14,223 @@ const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error('Erro ao abrir o banco de dados:', err.message);
     } else {
-        db.run(`CREATE TABLE IF NOT EXISTS messages (
-            user TEXT,
-            id TEXT,
-            time INTEGER,
-            body TEXT,
-            caption TEXT,
-            old_body TEXT,
-            type TEXT,
-            edited INTEGER,
-            status INTEGER,
-            imgvid TEXT,
-            doctitle TEXT
-        )`, (err) => {
-            if (err) {
-                console.error('Erro ao criar tabela:', err.message);
-            }
+        // Criação das tabelas
+        db.serialize(() => {
+            db.run(`CREATE TABLE IF NOT EXISTS messages (
+                id TEXT PRIMARY KEY,
+                user TEXT,
+                time INTEGER,
+                body TEXT,
+                type TEXT,
+                status INTEGER
+            )`, (err) => {
+                if (err) {
+                    console.error('Erro ao criar tabela messages:', err.message);
+                }
+            });
+
+            db.run(`CREATE TABLE IF NOT EXISTS messageEdits (
+                messageId TEXT,
+                oldBody TEXT,
+                newBody TEXT,
+                time INTEGER,
+                FOREIGN KEY (messageId) REFERENCES messages(id)
+            )`, (err) => {
+                if (err) {
+                    console.error('Erro ao criar tabela messageEdits:', err.message);
+                }
+            });
+
+            db.run(`CREATE TABLE IF NOT EXISTS imagens (
+                messageId TEXT,
+                caption TEXT,
+                mimetype TEXT,
+                width INTEGER,
+                height INTEGER,
+                mediaKeyTimestamp INTEGER,
+                jpegThumbnail BLOB,
+                contextInfo TEXT,
+                uploaded BLOB,
+                FOREIGN KEY (messageId) REFERENCES messages(id)
+            )`, (err) => {
+                if (err) {
+                    console.error('Erro ao criar tabela imagens:', err.message);
+                }
+            });
+
+            db.run(`CREATE TABLE IF NOT EXISTS videos (
+                messageId TEXT,
+                mimetype TEXT,
+                seconds INTEGER,
+                gifPlayback INTEGER,
+                caption TEXT,
+                height INTEGER,
+                width INTEGER,
+                mediaKeyTimestamp INTEGER,
+                jpegThumbnail BLOB,
+                gifAttribution INTEGER,
+                contextInfo TEXT,
+                uploaded BLOB,
+                FOREIGN KEY (messageId) REFERENCES messages(id)
+            )`, (err) => {
+                if (err) {
+                    console.error('Erro ao criar tabela videos:', err.message);
+                }
+            });
+
+            db.run(`CREATE TABLE IF NOT EXISTS audios (
+                messageId TEXT,
+                mimetype TEXT,
+                seconds INTEGER,
+                mediaKeyTimestamp INTEGER,
+                waveform BLOB,
+                contextInfo TEXT,
+                uploaded BLOB,
+                FOREIGN KEY (messageId) REFERENCES messages(id)
+            )`, (err) => {
+                if (err) {
+                    console.error('Erro ao criar tabela audios:', err.message);
+                }
+            });
+
+            db.run(`CREATE TABLE IF NOT EXISTS documentos (
+                messageId TEXT,
+                title TEXT,
+                data BLOB,
+                FOREIGN KEY (messageId) REFERENCES messages(id)
+            )`, (err) => {
+                if (err) {
+                    console.error('Erro ao criar tabela documentos:', err.message);
+                }
+            });
+
+            db.run(`CREATE TABLE IF NOT EXISTS stickers (
+                messageId TEXT,
+                mimetype TEXT,
+                mediaKeyTimestamp INTEGER,
+                isAnimated INTEGER,
+                isAvatar INTEGER,
+                isAiSticker INTEGER,
+                isLottie INTEGER,
+                contextInfo TEXT,
+                uploaded BLOB,
+                FOREIGN KEY (messageId) REFERENCES messages(id)
+            )`, (err) => {
+                if (err) {
+                    console.error('Erro ao criar tabela stickers:', err.message);
+                }
+            });
+
+            db.run(`CREATE TABLE IF NOT EXISTS vcards (
+                messageId TEXT,
+                data TEXT,
+                FOREIGN KEY (messageId) REFERENCES messages(id)
+            )`, (err) => {
+                if (err) {
+                    console.error('Erro ao criar tabela vcards:', err.message);
+                }
+            });
+
+            db.run(`CREATE TABLE IF NOT EXISTS locations (
+                messageId TEXT,
+                latitude REAL,
+                longitude REAL,
+                FOREIGN KEY (messageId) REFERENCES messages(id)
+            )`, (err) => {
+                if (err) {
+                    console.error('Erro ao criar tabela locations:', err.message);
+                }
+            });
+
+            db.run(`CREATE TABLE IF NOT EXISTS visualizacoes (
+                messageId TEXT,
+                data BLOB,
+                acaos INTEGER,
+                FOREIGN KEY (messageId) REFERENCES messages(id)
+            )`, (err) => {
+                if (err) {
+                    console.error('Erro ao criar tabela visualizacoes:', err.message);
+                }
+            });
         });
     }
 });
 
-// Função para verificar e excluir contas inativas
+// Função para verificar e excluir contas inativas (últimos 5 dias)
 function deleteInactiveUsersRealTime() {
     const currentTime = Date.now();
     const fiveDaysInMilliseconds = 5 * 24 * 60 * 60 * 1000; // 5 dias em milissegundos
 
     db.serialize(() => {
-        // Seleciona usuários inativos há mais de 5 dias
-        db.all('SELECT DISTINCT user, MAX(time) as lastActivity FROM messages GROUP BY user HAVING ? - lastActivity > ?', [currentTime, fiveDaysInMilliseconds], (err, rows) => {
-            if (err) {
-                console.error('Erro ao buscar usuários inativos:', err.message);
-                return;
-            }
+        db.all(
+            'SELECT DISTINCT user, MAX(time) as lastActivity FROM messages GROUP BY user HAVING ? - lastActivity > ?',
+            [currentTime, fiveDaysInMilliseconds],
+            (err, rows) => {
+                if (err) {
+                    console.error('Erro ao buscar usuários inativos:', err.message);
+                    return;
+                }
 
-            if (rows && rows.length > 0) {
-                rows.forEach((row) => {
-                    const { user } = row;
-                    console.log(`Excluindo dados do usuário inativo: ${user}`);
-                    db.run('DELETE FROM messages WHERE user = ?', [user], (err) => {
-                        if (err) {
-                            console.error(`Erro ao excluir dados do usuário ${user}:`, err.message);
-                        } else {
-                            console.log(`Usuário ${user} excluído com sucesso.`);
-                        }
+                if (rows && rows.length > 0) {
+                    rows.forEach((row) => {
+                        const { user } = row;
+
+                        if (!user) return;
+                        console.log(`[LIMPEZA] Excluindo dados do usuário inativo: ${user}`);
+                        db.run('DELETE FROM messages WHERE user = ?', [user], (err) => {
+                            if (err) {
+                                console.error(`[ERRO] Falha ao excluir dados do usuário ${user}:`, err.message);
+                            } else {
+                                console.log(`[SUCESSO] Dados do usuário ${user} excluídos.`);
+                            }
+                        });
                     });
-                });
-            }
-        });
+                }
+            },
+        );
     });
 }
 
-// Função para adicionar ou editar mensagens
-function addMessage(user, id, body, caption, status, edited, type, imgvid, doctitle) {
+function addMessage(user, id, body, type, status) {
     db.serialize(() => {
-        // Verifica se já existe uma mensagem do usuário com o mesmo ID
-        db.get('SELECT * FROM messages WHERE user = ? AND id = ?', [user, id], (err, row) => {
+        db.get('SELECT id FROM messages WHERE id = ?', [id], (err, row) => {
             if (err) {
-                console.error(err.message);
+                console.error(`[ERRO] Falha ao verificar mensagem do usuário ${user}:`, err.message);
                 return;
             }
 
             if (row) {
                 // Atualiza a mensagem existente
-                db.run('UPDATE messages SET old_body = ?, body = ?, caption = ?, time = ?, edited = 1, status = ?, doctitle = ? WHERE user = ? AND id = ?', [row.body, body, caption, Date.now(), status, doctitle, user, id], (err) => {
-                    if (err) {
-                        console.error(err.message);
-                    }
-                });
+                db.run(
+                    'UPDATE messages SET body = ?, type = ?, time = ?, status = ? WHERE id = ?',
+                    [body, type, Date.now(), status, id],
+                    (err) => {
+                        if (err) {
+                            console.error(`[ERRO] Falha ao atualizar mensagem do usuário ${user}:`, err.message);
+                        }
+                    },
+                );
             } else {
-                // Adiciona uma nova mensagem, limitando a 50 por usuário
+                // Adiciona uma nova mensagem, limitando a 200 por usuário
                 db.get('SELECT COUNT(*) as count FROM messages WHERE user = ?', [user], (err, row) => {
                     if (err) {
-                        console.error(err.message);
+                        console.error(`[ERRO] Falha ao contar mensagens do usuário ${user}:`, err.message);
                         return;
                     }
-                    if (row.count >= 50) {
-                        // Exclui a mensagem mais antiga se houver mais de 50
-                        db.run('DELETE FROM messages WHERE rowid IN (SELECT rowid FROM messages WHERE user = ? ORDER BY rowid ASC LIMIT 1)', [user], (err) => {
+                    if (row.count >= 200) {
+                        // Exclui a mensagem mais antiga se houver mais de 200
+                        db.run('DELETE FROM messages WHERE id IN (SELECT id FROM messages WHERE user = ? ORDER BY time ASC LIMIT 1)', [user], (err) => {
                             if (err) {
-                                console.error('Erro ao excluir mensagem antiga:', err.message);
+                                console.error(`[ERRO] Falha ao excluir mensagem antiga do usuário ${user}:`, err.message);
                             }
                         });
                     }
 
-                    // Insere a nova mensagem
-                    db.run('INSERT INTO messages (user, id, time, body, caption, type, imgvid, edited, status, doctitle) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)', [user, id, Date.now(), body, caption, type, imgvid, edited, status, doctitle], (err) => {
+                    // Insere ou substitui a mensagem
+                    db.run('REPLACE INTO messages (id, user, time, body, type, status) VALUES (?, ?, ?, ?, ?, ?)', [id, user, Date.now(), body, type, status], (err) => {
                         if (err) {
-                            console.error(err.message);
+                            console.error(`[ERRO] Falha ao inserir mensagem do usuário ${user}:`, err.message);
                         } else {
-                            // Limpeza de dados de usuários inativos após inserção de mensagem
                             deleteInactiveUsersRealTime();
                         }
                     });
@@ -112,28 +240,271 @@ function addMessage(user, id, body, caption, status, edited, type, imgvid, docti
     });
 }
 
-// Função para verificar mensagens deletadas
-function checkDeletedMessage(user, id) {
+/* function generateId() {
+    return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+} */
+
+function addEditMessage(messageId, oldBody, newBody) {
+    db.run('INSERT INTO messageEdits (messageId, oldBody, newBody, time) VALUES (?, ?, ?, ?)', [messageId, oldBody, newBody, Date.now()], (err) => {
+        if (err) {
+            console.error('[ERRO] Falha ao inserir mensagem editada:', err.message);
+        }
+    });
+}
+
+function addImage(messageId, upload, imageMessage) {
+    db.run(`INSERT INTO imagens (
+            messageId,
+            caption,
+            mimetype,
+            width,
+            height,
+            mediaKeyTimestamp,
+            contextInfo,
+            jpegThumbnail,
+            uploaded
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+        messageId,
+        imageMessage.caption || '',
+        imageMessage.mimetype || '',
+        imageMessage.width || 0,
+        imageMessage.height || 0,
+        imageMessage.mediaKeyTimestamp?.toNumber?.() || 0,
+        JSON.stringify(imageMessage.contextInfo) || null,
+        Buffer.from(imageMessage.jpegThumbnail || []),
+        upload], (err) => {
+        if (err) {
+            console.error('[ERRO] Falha ao inserir imagem:', err.message);
+        }
+    });
+}
+
+function addVideo(messageId, uploaded, videoMessage) {
+    db.run(`INSERT INTO videos (
+            messageId,
+            mimetype,
+            seconds,
+            gifPlayback,
+            caption,
+            height,
+            width,
+            mediaKeyTimestamp,
+            jpegThumbnail,
+            gifAttribution,
+            contextInfo,
+            uploaded
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+        messageId,
+        videoMessage.mimetype || '',
+        videoMessage.seconds || 0,
+        videoMessage.gifPlayback || 0,
+        videoMessage.caption || '',
+        videoMessage.height || 0,
+        videoMessage.width || 0,
+        videoMessage.mediaKeyTimestamp?.toNumber?.() || 0,
+        Buffer.from(videoMessage.jpegThumbnail || []),
+        videoMessage.gifAttribution || 0,
+        JSON.stringify(videoMessage.contextInfo) || null,
+        uploaded,
+    ], (err) => {
+        if (err) {
+            console.error('[ERRO] Falha ao inserir vídeo:', err.message);
+        }
+    });
+}
+
+function addAudio(messageId, uploaded, audioMessage) {
+    db.run(`INSERT INTO audios (
+            messageId,
+            mimetype,
+            seconds,
+            mediaKeyTimestamp,
+            waveform,
+            contextInfo,
+            uploaded
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`, [
+        messageId,
+        audioMessage.mimetype || '',
+        audioMessage.seconds || 0,
+        audioMessage.mediaKeyTimestamp?.toNumber?.() || 0,
+        Buffer.from(audioMessage.waveform || []),
+        JSON.stringify(audioMessage.contextInfo) || null,
+        uploaded,
+    ], (err) => {
+        if (err) {
+            console.error('[ERRO] Falha ao inserir áudio:', err.message);
+        }
+    });
+}
+
+function addDocument(messageId, title, data) {
+    db.run('INSERT INTO documentos (messageId, title, data) VALUES (?, ?, ?)', [messageId, title, data], (err) => {
+        if (err) {
+            console.error('[ERRO] Falha ao inserir documento:', err.message);
+        }
+    });
+}
+
+function addSticker(messageId, uploaded, stickerMessage) {
+    db.run(`INSERT INTO stickers (
+            messageId,
+            mimetype,
+            mediaKeyTimestamp,
+            isAnimated,
+            isAvatar,
+            isAiSticker,
+            isLottie,
+            contextInfo,
+            uploaded
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`, [
+        messageId,
+        stickerMessage.mimetype || '',
+        stickerMessage.mediaKeyTimestamp?.toNumber?.() || 0,
+        stickerMessage.isAnimated || 0,
+        stickerMessage.isAvatar || 0,
+        stickerMessage.isAiSticker || 0,
+        stickerMessage.isLottie || 0,
+        JSON.stringify(stickerMessage.contextInfo) || null,
+        uploaded,
+    ], (err) => {
+        if (err) {
+            console.error('[ERRO] Falha ao inserir sticker:', err.message);
+        }
+    });
+}
+
+function addVCard(messageId, data) {
+    db.run('INSERT INTO vcards (messageId, data) VALUES (?, ?)', [messageId, data], (err) => {
+        if (err) {
+            console.error('[ERRO] Falha ao inserir vcard:', err.message);
+        }
+    });
+}
+
+function addLocation(messageId, latitude, longitude) {
+    db.run('INSERT INTO locations (messageId, latitude, longitude) VALUES (?, ?, ?)', [messageId, latitude, longitude], (err) => {
+        if (err) {
+            console.error('[ERRO] Falha ao inserir localização:', err.message);
+        }
+    });
+}
+
+function addVisualizacao(messageId, data, status) {
+    db.run('INSERT INTO visualizacoes (messageId, data, acaos) VALUES (?, ?, ?)', [messageId, data, status], (err) => {
+        if (err) {
+            console.error('[ERRO] Falha ao inserir visualização:', err.message);
+        }
+    });
+}
+
+// Função auxiliar para buscar dados de mídia
+function getMediaData(table, messageId) {
     return new Promise((resolve, reject) => {
-        db.get('SELECT body, caption, old_body, type, imgvid, edited, status, doctitle FROM messages WHERE user = ? AND id = ?', [user, id], (err, row) => {
+        let query = '';
+
+        switch (table) {
+        case 'documentos':
+            query = `SELECT title, data FROM ${table} WHERE messageId = ?`;
+            break;
+        case 'locations':
+            query = `SELECT latitude, longitude FROM ${table} WHERE messageId = ?`;
+            break;
+        case 'vcards':
+            query = `SELECT data FROM ${table} WHERE messageId = ?`;
+            break;
+        case 'visualizacoes':
+            query = `SELECT data, acaos FROM ${table} WHERE messageId = ?`;
+            break;
+        default:
+            // Para imagens, vídeos, áudios, stickers, etc.
+            query = `SELECT * FROM ${table} WHERE messageId = ?`;
+            break;
+        }
+
+        db.get(query, [messageId], (err, row) => {
             if (err) {
-                console.error('Erro ao buscar mensagem:', err.message);
+                console.error(`❌ Erro ao buscar dados da tabela '${table}':`, err.message);
                 reject(err);
-                return;
-            }
-            if (row) {
-                const { body: message, caption: captionMessage, old_body: oldBody, type: tipos, imgvid: upload, status, doctitle } = row;
-                resolve({ message, captionMessage, oldBody, tipos, upload, status, doctitle });
             } else {
-                resolve(null);
+                resolve(row || null);
             }
         });
     });
 }
 
-// Função para ocultar URLs
-function hideUrls(message) {
-    return message.replace(/https?:\/\/[^\s]+/g, 'https://chat.whatsapp.com/*************');
+// Função aprimorada para verificar mensagens deletadas, incluindo diferentes tipos de mídia
+async function checkDeletedMessage(user, id) {
+    try {
+        const message = await new Promise((resolve, reject) => {
+            db.get('SELECT id, user, time, body, type, status FROM messages WHERE id = ? AND user = ?', [id, user], (err, row) => {
+                if (err) {
+                    console.error('Erro ao buscar mensagem:', err.message);
+                    reject(err);
+                } else {
+                    resolve(row);
+                }
+            });
+        });
+
+        if (!message) {
+            return null;
+        }
+
+        let mediaData = null;
+        switch (message.status) {
+        case 1: // Imagem
+            mediaData = await getMediaData('imagens', id);
+            break;
+        case 2: // Mensagem Editada
+            mediaData = await new Promise((resolve, reject) => {
+                db.get('SELECT oldBody, newBody FROM messageEdits WHERE messageId = ?', [id], (err, row) => {
+                    if (err) {
+                        console.error('Erro ao buscar dados de messageEdits:', err.message);
+                        reject(err);
+                    } else {
+                        resolve(row || null);
+                    }
+                });
+            });
+            break;
+        case 3: // Sticker
+            mediaData = await getMediaData('stickers', id);
+            break;
+        case 4: // Vídeo
+            mediaData = await getMediaData('videos', id);
+            break;
+        case 5: // Visualização
+            mediaData = await getMediaData('visualizacoes', id);
+            break;
+        case 6: // Áudio
+            mediaData = await getMediaData('audios', id);
+            break;
+        case 7: // Documento
+            mediaData = await getMediaData('documentos', id);
+            break;
+        case 8: // VCard
+            mediaData = await getMediaData('vcards', id);
+            break;
+        case 9: // Localização
+            mediaData = await getMediaData('locations', id);
+            break;
+        default:
+            break;
+        }
+
+        return {
+            id: message.id,
+            user: message.user,
+            time: message.time,
+            message: message.body,
+            type: message.type,
+            status: message.status,
+            mediaData,
+        };
+    } catch (error) {
+        console.error('Erro ao verificar mensagem deletada:', error);
+        return null;
+    }
 }
 
 // Função para formatar a data para o horário de Brasília
@@ -143,7 +514,7 @@ function formatDateToBrasilia(timestamp) {
 
 function CheckMessage(user) {
     return new Promise((resolve, reject) => {
-        db.all('SELECT body, caption, old_body, time, edited, status FROM messages WHERE user = ?', [user], (err, rows) => {
+        db.all('SELECT id, body, type, time, status FROM messages WHERE user = ?', [user], (err, rows) => {
             if (err) {
                 console.error('Erro ao buscar mensagens:', err.message);
                 reject(err);
@@ -166,10 +537,9 @@ function CheckMessage(user) {
                     return `[${formattedTime}] Documentos: 📚`;
                 } else if (row.status === 8) {
                     return `[${formattedTime}] Contato: 📞`;
-                } else if (row.edited && row.old_body !== row.body) {
-                    return `[${formattedTime}] *[ANTIGA MENSAGEM EDITADA]:* "${row.old_body}"\n[${formattedTime}] *[NOVA MENSAGEM EDITADA]:* "${row.body}"`;
+                } else {
+                    return `[${formattedTime}] ` + row.body;
                 }
-                return `[${formattedTime}] ` + hideUrls(row.body);
             });
             resolve(messages.length > 0 ? messages : []);
         });
@@ -196,55 +566,18 @@ function getAllMessagesInChat(user, quantidades) {
     });
 }
 
-// #COMANDOS
-/* const { getAllMessagesInChat } = require('arquivo'); // Certifique-se de que o caminho do arquivo esteja correto
-
-case 'dellast':
-    if (!isGroupMsg) return await kill.sendMessage(chatId, { text: 'Somente grupos podem usar os comandos.', }, { quoted: quoteThis });
-    if (!isGroupAdmins) return  await kill.sendMessage(chatId, { text: 'Você não é um administrador desde grupos.', }, { quoted: quoteThis });
-    if (!isBotGroupAdmins) return  await kill.sendMessage(chatId, { text: 'O bot precisa de um administrador para ser executado.', }, { quoted: quoteThis });
-    const mentionMsg = quoteThis.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || quoteThis.message?.extendedTextMessage?.contextInfo?.participant;
-    const mentionCitadaMsg = !!quoteThis.message?.extendedTextMessage?.contextInfo?.participant;
-    if (!mentionMsg) return await kill.sendMessage(chatId, { text: `[CMD]: ${prefix}dellast @users/Message <quantidades>\n\n> Marque a pessoa que deseja que eu faça isso!`, }, { quoted: quoteThis });
-    const quantidadesMsg = mentionCitadaMsg ? parseInt(args[0]) : parseInt(args[1]);
-    if (isNaN(quantidadesMsg) || quantidadesMsg < 1 || quantidadesMsg > 20) return await kill.sendMessage(chatId, { text: `[CMD]: ${prefix}dellast @users/Message <quantidades>\n\n` + 'Por favor, forneça um número de mensagens válido para deletar (de 1 a 20).', }, { quoted: quoteThis });
-
-    try {
-        const resultcheck = await getAllMessagesInChat(mentionMsg, quantidadesMsg);
-        if (!Array.isArray(resultcheck) || resultcheck.length === 0) return await kill.sendMessage(chatId, { text: 'Nenhuma mensagem encontrada para deletar.', }, { quoted: quoteThis });
-        for (const idMsg of resultcheck) {
-            if (!idMsg) {
-                console.warn('ID de mensagem inválido:', idMsg);
-                continue;
-            }
-            await new Promise(resolve => setTimeout(resolve, 1000)); // Intervalo de 1 segundo e 1000 milissegundos
-            kill.sendMessage(chatId, { delete: { remoteJid: chatId, fromMe: false, id: idMsg, participant: mentionMsg } });
-        }
-        // await kill.sendMessage(chatId, { text: 'Mensagens do histórico de conversas recentes foram apagadas com sucesso', }, { quoted: quoteThis });
-    } catch (error) {
-        console.error('Erro ao tentar deletar as mensagens:', error);
-        await kill.sendMessage(chatId, { text: 'Erro ao tentar deletar as mensagens: ' + error.message, }, { quoted: quoteThis });
-    }
-    break;
-
-/* const { CheckMessage } = require('arquivo'); // Certifique-se de que o caminho do arquivo esteja correto
-
-case 'historico':
-    // Se for para membros ou somente administradores, poderão usar os comandos que quiserem
-    // if (!isGroupAdmins) return  await kill.sendMessage(chatId, { text: 'Você não é um administrador desde grupos.', }, { quoted: quoteThis });
-        const mentionMsg = quoteThis.message?.extendedTextMessage?.contextInfo?.mentionedJid?.[0] || quoteThis.message?.extendedTextMessage?.contextInfo?.participant;
-        CheckMessage(mentionMsg).then(messages => {
-            if (messages.length === 0) {
-                await kill.sendMessage(chatId, { text: 'Nenhuma mensagem encontrada para este usuário.', }, { quoted: quoteThis });
-            } else {
-                await kill.sendMessage(chatId, { text: `*HISTORICO MENSAGEMS CONVERSAR*\n${messages.join('\n')}`, }, { quoted: quoteThis });
-            }
-        }).catch(err => {
-            console.error('Erro ao obter mensagens:', err);
-            await kill.sendMessage(chatId, { text: 'Erro ao recuperar mensagens.', }, { quoted: quoteThis });
-        });
-    break;
-
-*/
-
-module.exports = { addMessage, checkDeletedMessage, CheckMessage, getAllMessagesInChat };
+module.exports = {
+    addMessage,
+    addEditMessage,
+    addImage,
+    addVideo,
+    addAudio,
+    addDocument,
+    addSticker,
+    addVCard,
+    addLocation,
+    addVisualizacao,
+    checkDeletedMessage,
+    CheckMessage,
+    getAllMessagesInChat,
+};

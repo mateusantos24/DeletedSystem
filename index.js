@@ -25,8 +25,7 @@ Cole o seguinte código:
 */
 
 const fs = require('fs');
-
-const { downloadMediaMessage } = require('baileys');
+const { downloadMediaMessage, downloadContentFromMessage } = require('baileys');
 
 const Indexer = require('../../../index');
 
@@ -46,12 +45,33 @@ function ambientDetails() {
 }
 
 // Função do SQLITE3
-const { addMessage, checkDeletedMessage } = require('./Cache/delete');
+const {
+    addMessage,
+    checkDeletedMessage,
+    addImage,
+    addVideo,
+    addSticker,
+    addVisualizacao,
+    addAudio,
+    addDocument,
+    addVCard,
+} = require('./Cache/delete');
+
+function formatBytes(bytes, decimals = 2) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const value = parseFloat((bytes / Math.pow(k, i)).toFixed(decimals));
+    return `${value} ${sizes[i]}`;
+}
 
 async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, data = envInfo.functions.exec.arguments.data.value) {
     envInfo.results.value = false;
     envInfo.results.success = false;
     const monitorID = envInfo.parameters.monitorID.value;
+    // const memoryVideo = Number(envInfo.parameters.memoryVideo.value); // Limite de vídeo 16MB, valor pode ser editado
+    const messageText = Number(envInfo.parameters.messageText.value); // Limite máximo de caracteres em mensagens de texto
 
     if (!monitorID || monitorID.length === 0) return console.warn('[ANTI-DELETED AVISO]: O valor de "monitorID" está vazio. Certifique-se de definir um valor antes de continuar.');
 
@@ -61,165 +81,277 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
             const {
                 id,
                 user,
-                quoteThis,
-                type,
-                pushname,
                 chatId,
-                body,
+                pushname,
                 name,
                 time,
+                quoteThis,
                 mimetype,
+                message,
+                quotedMsg,
+                recMessage,
+                type,
+                quotedMsgObj,
             } = data;
-            if (user === 'status@broadcast') return;
-            if (user?.includes('@lid')) return;
+            if (/^(status@broadcast|.*@(lid|bot))$/.test(user)) return;
             const isMediaMessage = quoteThis?.message?.stickerMessage || quoteThis?.message?.imageMessage || quoteThis?.message?.videoMessage || quoteThis?.message?.audioMessage || quoteThis?.message?.documentWithCaptionMessage?.message?.documentMessage || quoteThis?.message?.documentMessage;
             const isVisu = quoteThis.message?.viewOnceMessageV2?.message?.videoMessage || quoteThis.message?.viewOnceMessage?.message?.videoMessage || quoteThis?.message?.viewOnceMessageV2?.message?.imageMessage || quoteThis.message?.viewOnceMessage?.message?.imageMessage || false;
             if (isVisu) {
                 isVisu.viewOnce = false;
             }
-            const decryptedMedia = (isMediaMessage || isVisu) ? await downloadMediaMessage(quoteThis, 'buffer') : '';
+            const quotedMsgBuffer = quoteThis?.message?.extendedTextMessage?.contextInfo?.quotedMessage;
+            const imageMessage = quotedMsgBuffer?.imageMessage || quotedMsgBuffer?.viewOnceMessageV2?.message?.imageMessage;
+            let decryptedMediaView = '';
+            if (imageMessage) {
+                try {
+                    const stream = await downloadContentFromMessage(imageMessage, 'image');
+                    let buffer = Buffer.from([]);
+                    for await (const chunk of stream) {
+                        buffer = Buffer.concat([buffer, chunk]);
+                    }
+                    decryptedMediaView = buffer;
+                } catch (error) {
+                    console.log('Error downloading quoted image:', error);
+                    decryptedMediaView = '';
+                }
+            }
 
-            const mentionUser = quoteThis?.message?.protocolMessage?.key?.participant ? quoteThis?.message?.protocolMessage?.key?.participant : user;
+            const decryptedMediaDelete = (isMediaMessage || isVisu) ? await downloadMediaMessage(quoteThis, 'buffer') : '';
+            const mentionUser = recMessage?.key?.participant ? recMessage?.key?.participant : user;
             const userNames = Indexer('sql').get('personal', mentionUser, chatId).value;
             const checkName = userNames === 'default' || !userNames.name.text.trim() ? pushname : userNames.name.text.trim();
-            const Msg = quoteThis?.message?.documentWithCaptionMessage?.message?.documentMessage?.caption || quoteThis?.message?.documentMessage?.caption || quoteThis?.message?.videoMessage?.caption || quoteThis?.message?.imageMessage?.caption || quoteThis?.message?.extendedTextMessage?.text || quoteThis.message?.conversation || '';
-            const tipos = quoteThis?.message?.protocolMessage ? 'protocolMessage' : quoteThis?.message?.extendedTextMessage ? 'extendedTextMessage' : quoteThis?.message?.conversation ? 'conversation' : quoteThis?.message?.viewOnceMessageV2 ? 'viewOnceMessageV2' : quoteThis?.message?.viewOnceMessage ? 'viewOnceMessage' : quoteThis?.message?.stickerMessage ? 'stickerMessage' : quoteThis?.message?.imageMessage ? 'imageMessage' : quoteThis?.message?.videoMessage ? 'videoMessage' : quoteThis?.message?.audioMessage ? 'audioMessage' : quoteThis?.message?.documentMessage ? 'documentMessage' : quoteThis?.message?.editedMessage ? 'editedMessage' : quoteThis?.editedMessage ? 'editedMessage' : type;
-            const editarID = quoteThis?.message?.editedMessage?.message?.protocolMessage?.key?.id || quoteThis?.message?.protocolMessage?.key?.id || '';
-            const FileNameDoc = quoteThis?.message?.documentWithCaptionMessage?.message?.documentMessage?.fileName || quoteThis?.message?.documentMessage?.fileName || false;
-            const contactCard = quoteThis.message?.contactMessage?.vcard ? quoteThis.message.contactMessage.vcard : false;
+            const editarID = recMessage?.key?.id || '';
+            const mentionID = quotedMsg?.stanzaId || '';
+            const contactCard = recMessage?.vcard;
+
+            const wasDeletedByAdmin = user && user !== mentionUser;
+            const deletedBy = wasDeletedByAdmin ? user : mentionUser;
+            const deletedByName = Indexer('sql').get('personal', user, chatId).value;
+            const deletedByDisplayName = !deletedByName || deletedByName === 'default' || !deletedByName.name.text.trim() ? (pushname || 'Desconhecido') : deletedByName.name.text.trim();
+
+            const deletedInfo = wasDeletedByAdmin ? `*⭐ APAGADO POR UM ADMIN:* (${deletedByDisplayName}) [${deletedBy.replace('@s.whatsapp.net', '')}]\n\n` : '';
 
             var baileysMessage = {};
             let alertaLog = false;
-
-            // Declara fora do switch (result)
-            let result;
-            let tiposValidosRegExp = /^(application\/(pdf|msword|vnd\.openxmlformats-officedocument\.wordprocessingml\.document|vnd\.ms-excel|vnd\.openxmlformats-officedocument\.spreadsheetml\.sheet|zip|x-rar-compressed|x-7z-compressed|x-tar|gzip|vnd\.oasis\.opendocument\.(text|spreadsheet|presentation)|epub\+zip|json|rtf|octet-stream)|text\/(plain|csv|markdown|html)|application\/javascript)$/;
-
-            switch (tipos) {
-            // Anti editado
-            case 'editedMessage': {
-                const editedMessageObj = quoteThis?.editedMessage?.message?.protocolMessage?.editedMessage || quoteThis?.message?.editedMessage?.message?.protocolMessage?.editedMessage || quoteThis?.editedMessage?.message?.editedMessage;
-                const editedMessage = editedMessageObj?.videoMessage?.caption
-                  || editedMessageObj?.imageMessage?.caption
-                  || editedMessageObj?.extendedTextMessage?.text
-                  || editedMessageObj?.conversation
-                  || editedMessageObj?.documentMessage?.title
-                  || editedMessageObj?.stickerMessage?.emoji
-                  || 'Mensagem editada não disponível';
-                addMessage(user, editarID, body, editedMessage, 2, true, mimetype, false, false);
-                await Indexer('others').sleep(2000); // Intervalo de 2 segundos carregar o Banco de dados
-                let LastUpdateNow = await checkDeletedMessage(user, editarID);
-                const { message, tipos, upload, oldBody } = LastUpdateNow;
-                if (tipos === 'video/mp4') {
-                    baileysMessage.video = upload;
-                    baileysMessage.caption = `*⚠️ ALERTA MENSAGEM EDITADA 📝*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ MENSAGEM EDITADA:*\n\n> ANTIGA: ${oldBody}\n#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-\n> NOVA: ${message}`;
-                    baileysMessage.mimetype = mimetype;
-                } else if (tipos === 'image/jpeg') {
-                    baileysMessage.image = upload;
-                    baileysMessage.caption = `*⚠️ ALERTA MENSAGEM EDITADA 📝*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ MENSAGEM EDITADA:*\n\n> ANTIGA: ${oldBody}\n#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-\n> NOVA: ${message}`;
-                    baileysMessage.mimetype = mimetype;
-                } else {
-                    baileysMessage.text = `*⚠️ ALERTA MENSAGEM EDITADA 📝*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ MENSAGEM EDITADA:*\n\n> ANTIGA: ${oldBody}\n#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-#-\n> NOVA: ${message}`;
+            let DeleteMessage;
+            if (quotedMsgObj?.viewOnce) {
+                addVisualizacao(mentionID, decryptedMediaView, false);
+                addMessage(user, mentionID, quotedMsgObj?.caption, quotedMsgObj?.mimetype, 5);
+            }
+            switch (type) {
+            // Anti Deletado
+            case 'protocolMessage': {
+                DeleteMessage = await checkDeletedMessage(mentionUser, editarID);
+                console.log(DeleteMessage);
+                const cmdColor = config.colorSet.value[2]; // red 2
+                if (!DeleteMessage) return console.log(Indexer('color').echo('[ANTI-DELETED] ' + checkName + ' (' + mentionUser.replace('@s.whatsapp.net', '') + ') A mensagem deletada não foi encontrada e será ignorada...', cmdColor).value);
+                const UserDelete = DeleteMessage?.user;
+                const TextDelete = DeleteMessage?.message;
+                const mediaDataDelete = DeleteMessage?.mediaData;
+                console.log(Indexer('color').echo('╔═══════════════ ANTI-DELETE LOG ═══════════════╗\n'
+                    + '║ User: ' + `${checkName} (${UserDelete.replace('@s.whatsapp.net', '')})` + '\n'
+                    + '║ Text: ' + (TextDelete?.length > 20 ? TextDelete.substring(0, 20) + '...' : TextDelete) + '\n'
+                    + '║ Status: ' + (DeleteMessage?.status || '0') + '\n'
+                    + '║ Media: ' + (mediaDataDelete ? 'YES' : 'NO') + '\n'
+                    + '╚═══════════════════════════════════════════════╝', cmdColor).value);
+                switch (DeleteMessage?.status) {
+                case 0: { // Mensagens de texto
+                    baileysMessage.text = '🚨 *EITA, MENSAGEM DELETADA!* 🚨\n\n'
+                    + '👀 Achou que dava pra apagar na miúda, né? Pegamos no pulo!\n\n'
+                    + '🙋‍♂️ *Autor:* ' + checkName + ' (' + mentionUser.replace('@s.whatsapp.net', '') + ')\n'
+                    + '👥 *Grupo:* ' + name + '\n'
+                    + '📅 *Quando mandou:* ' + new Date(DeleteMessage.time).toLocaleString() + '\n'
+                    + '🕵️ *Detectado agora:* ' + time + '\n\n'
+                    + deletedInfo
+                    + '💬 *Mensagem recuperada:*\n'
+                    + '> ' + TextDelete + '\n\n'
+                    + '😎 Tenta apagar de novo, vai... Já foi tarde!';
+                    break;
+                }
+                case 1: { // Mensagens de imagem
+                    baileysMessage.image = mediaDataDelete?.uploaded;
+                    baileysMessage.caption = '🖼️ *ALERTA DE IMAGEM DELETADA* 🖼️\n\n'
+                    + '😏 Acha que ia passar batido?\n'
+                    + '📸 *Imagem apagada com sucesso (mas não pra gente)!*\n\n'
+                    + '👤 *Autor:* ' + checkName + ' (' + UserDelete.replace('@s.whatsapp.net', '') + ')\n'
+                    + '👥 *Grupo:* ' + name + '\n'
+                    + '🕒 *Enviada em:* ' + new Date(DeleteMessage.time).toLocaleString() + '\n'
+                    + '🧠 *Detectamos em:* ' + time + '\n\n'
+                    + '📁 *Tamanho:* ' + formatBytes(mediaDataDelete.uploaded.length) + '\n'
+                    + '📐 *Resolução:* ' + mediaDataDelete.width + 'x' + mediaDataDelete.height + '\n'
+                    + '📦 *Tipo:* ' + mediaDataDelete.mimetype + '\n\n'
+                    + deletedInfo
+                    + '🫢 *Não adianta apagar... o bot viu tudo!*\n'
+                    + '> ' + TextDelete;
+                    baileysMessage.mimetype = mediaDataDelete.mimetype;
+                    break;
+                }
+                case 2: { // Mensagens de texto Editado
+                    // Em breve....
+                    break;
+                }
+                case 3: { // Mensagens de Stickers
+                    await kill.sendMessage(chatId, { sticker: mediaDataDelete?.uploaded, mimetype: mediaDataDelete.mimetype });
+                    await Indexer('others').sleep(1000);
+                    baileysMessage.text = '🚨 *ALERTA DE STICKER DELETADO* 🚨\n\n'
+                    + '👀 Pegamos no flagra!\n'
+                    + `🔹 *Grupo:* ${name}\n`
+                    + `🔹 *Membro:* ${checkName} (${UserDelete.replace('@s.whatsapp.net', '')})\n`
+                    + `📅 *Enviado em:* ${new Date(DeleteMessage.time).toLocaleString()}\n`
+                    + `🕵️‍♂️ *Detectado:* ${time}\n\n`
+                    + `📁 Tamanho: ${formatBytes(mediaDataDelete.uploaded.length)}\n`
+                    + `📦 Mimetype: ${mediaDataDelete.mimetype}\n\n`
+                    + deletedInfo
+                    + 'Não adianta apagar... já vimos! 😜\n'
+                    + `> ${TextDelete}`;
+                    break;
+                }
+                case 4: { // Mensagens de vídeo
+                    baileysMessage.video = mediaDataDelete?.uploaded;
+                    baileysMessage.caption = '🎥 *VÍDEO DELETADO DETECTADO!* 🎥\n\n'
+                    + '🎭 Tentou sumir com o vídeo? O FBI do Zap já viu tudo!\n\n'
+                    + '🙋‍♂️ *Autor:* ' + checkName + ' (' + UserDelete.replace('@s.whatsapp.net', '') + ')\n'
+                    + '👥 *Grupo:* ' + name + '\n'
+                    + '📅 *Enviado em:* ' + new Date(DeleteMessage.time).toLocaleString() + '\n'
+                    + '🕵️ *Detectado agora:* ' + time + '\n\n'
+                    + '📁 Tamanho: ' + formatBytes(mediaDataDelete.uploaded.length) + '\n'
+                    + '📦 Mimetype: ' + mediaDataDelete.mimetype + '\n'
+                    + '⏱ Duração: ' + mediaDataDelete.seconds + ' segundos\n\n'
+                    + '💬 *Mensagem que acompanhava:*\n'
+                    + '> ' + TextDelete + '\n\n'
+                    + deletedInfo
+                    + '😎 Apagar não apaga o passado... Já tá tudo salvo no HD da zoeira!';
+                    baileysMessage.mimetype = mediaDataDelete.mimetype;
+                    break;
+                }
+                case 5: { // Mensagens de visualização
+                    if (!DeleteMessage?.status) return 1;
+                    baileysMessage.viewOnce = false;
+                    if (DeleteMessage.type.startsWith('video')) {
+                        baileysMessage.video = mediaDataDelete?.data;
+                    } else if (DeleteMessage.type.startsWith('image')) {
+                        baileysMessage.image = mediaDataDelete?.data;
+                    }
+                    baileysMessage.caption = '👀 *VISUALIZAÇÃO ÚNICA DETECTADA & DELETADA!* 👀\n\n'
+                    + '🎬 *Operação Olho Vivo Ativada!*\n'
+                    + '💣 Tentou mandar e apagar como se ninguém visse? Tarde demais, agente secreto!\n\n'
+                    + '🙋‍♂️ *Autor:* ' + checkName + ' (' + UserDelete.replace('@s.whatsapp.net', '') + ')\n'
+                    + '👥 *Grupo:* ' + name + '\n'
+                    + '📅 *Enviado em:* ' + new Date(DeleteMessage.time).toLocaleString() + '\n'
+                    + '🕵️ *Detectado no exato momento:* ' + time + '\n\n'
+                    + '📁 *Tamanho:* ' + formatBytes(mediaDataDelete?.data?.length) + '\n'
+                    + '📦 *Tipo:* ' + DeleteMessage.type + '\n\n'
+                    + '💬 *Mensagem secreta que veio junto:*\n'
+                    + '> ' + TextDelete + '\n\n'
+                    + '🎥 E a câmera do bot? Sempre ligada. Cê vacilou... nós printamos!';
+                    baileysMessage.mimetype = DeleteMessage?.type;
+                    addVisualizacao(DeleteMessage.id, decryptedMediaView, true);
+                    break;
+                }
+                case 6: { // Mensagens de áudio
+                    await kill.sendMessage(chatId, { audio: mediaDataDelete?.uploaded, mimetype: mediaDataDelete.mimetype });
+                    await Indexer('others').sleep(1000);
+                    baileysMessage.caption = '🎵 *ÁUDIO DELETADO DETECTADO!* 🎵\n\n'
+                    + '🎙️ Tentou mandar aquele áudio e apagar rapidinho? HA! Pegamos! 😂\n\n'
+                    + '🙋‍♂️ *Autor:* ' + checkName + ' (' + UserDelete.replace('@s.whatsapp.net', '') + ')\n'
+                    + '👥 *Grupo:* ' + name + '\n'
+                    + '📅 *Enviado em:* ' + new Date(DeleteMessage.time).toLocaleString() + '\n'
+                    + '🕵️ *Detectado agora:* ' + time + '\n\n'
+                    + '📁 Tamanho: ' + formatBytes(mediaDataDelete.uploaded.length) + '\n'
+                    + '📦 Mimetype: ' + mediaDataDelete.mimetype + '\n'
+                    + '⏱ Duração: ' + mediaDataDelete.seconds + ' segundos\n\n'
+                    + deletedInfo
+                    + '🔊 Já escutamos tudinho… Nada escapa do bot! 😎';
+                    break;
+                }
+                case 7: { // Mensagens de documentos
+                    baileysMessage.document = mediaDataDelete?.data;
+                    baileysMessage.mimetype = `application/${DeleteMessage.type}`;
+                    baileysMessage.fileName = mediaDataDelete?.title;
+                    baileysMessage.caption = '🎙 *ATENÇÃO, BRASIL!* 📢\n\n'
+                    + 'Hoje no *Arquivo Confidencial do Zap*... alguém tentou apagar um documento, MAS O BOT VIU TUDO!\n\n'
+                    + '👤 *Nome:* ' + checkName + '\n'
+                    + '📞 *Número:* ' + UserDelete.replace('@s.whatsapp.net', '') + '\n'
+                    + '📌 *Grupo:* ' + name + '\n\n'
+                    + '📎 *Documento:* ' + (mediaDataDelete?.title || 'Sem título') + '\n'
+                    + '📦 *Formato:* ' + DeleteMessage.type + '\n'
+                    + '📁 *Tamanho:* ' + formatBytes(mediaDataDelete.data.length) + '\n\n'
+                    + '📅 *Original:* ' + new Date(DeleteMessage.time).toLocaleString() + '\n'
+                    + '⏱ *Detectado:* ' + time + '\n\n'
+                    + deletedInfo
+                    + '📼 E assim a verdade foi revelada. Fica ligado, porque aqui nada passa batido! 🤓';
+                    break;
+                }
+                case 8: { // Mensagens de vCard
+                    await kill.sendMessage(chatId, { contacts: { contacts: [{ vcard: mediaDataDelete?.data }] } });
+                    await Indexer('others').sleep(1000);
+                    baileysMessage.text = '👤 *EITA! TENTOU APAGAR UM CONTATO?* 😜\n\n'
+                    + '💥 Mal sabia que o *Zap Detetive* estava de olho!\n\n'
+                    + '📌 *Grupo:* ' + name + '\n'
+                    + '🧍‍♂️ *Apagador:* ' + checkName + ' (' + UserDelete.replace('@s.whatsapp.net', '') + ')\n'
+                    + '📅 *Mandou:* ' + new Date(DeleteMessage.time).toLocaleString() + '\n'
+                    + '⏱ *Apagou às:* ' + time + '\n\n'
+                    + deletedInfo
+                    + '📇 *Contato recuperado! Não adianta apagar!* 🚨';
+                    break;
+                }
+                case 9: { // Mensagens de localização
+                    // Em breve....
+                    break;
+                }
                 }
                 alertaLog = true;
                 break;
             }
 
-            // Anti Deletado
-            case 'protocolMessage': {
-                result = await checkDeletedMessage(mentionUser, editarID);
-                if (result) {
-                    // eslint-disable-next-line no-unused-vars
-                    const { message, captionMessage, oldBody, tipos, upload, status, doctitle } = result;
-                    if (tipos === 'video/mp4' || tipos === 'video/webm' || tipos === 'video/ogg' || tipos === 'video/3gpp' || tipos === 'video/avi' || tipos === 'video/mkv' || tipos === 'video/flv' || tipos === 'video/quicktime') {
-                        baileysMessage.viewOnce = false;
-                        baileysMessage.video = upload;
-                        baileysMessage.caption = `*⚠️ ALERTA DO VÍDEO 🎬*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ VÍDEO FOI APAGADO E DETECTADO*\n> ${message || captionMessage || ''}`;
-                        baileysMessage.mimetype = tipos;
-                    } else if (tipos === 'image/jpeg' || tipos === 'image/png' || tipos === 'image/gif') {
-                        baileysMessage.viewOnce = false;
-                        baileysMessage.image = upload;
-                        baileysMessage.caption = `*⚠️ ALERTA DA IMAGEM 🖼*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ IMAGEM FOI APAGADA E DETECTADA*\n> ${message || captionMessage || ''}`;
-                        baileysMessage.mimetype = tipos;
-                    } else if (tipos === 'image/webp') {
-                        await kill.sendMessage(monitorID, { sticker: upload });
-                        await Indexer('others').sleep(1000); // Intervalo de 1 segundo entre stickers, risco de banimento por duplicação no WhatsAp
-                        baileysMessage.text = `*⚠️ ALERTA DAS FIGURINHAS 👾*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ FOI APAGADA E DETECTADA*\n> ${message || captionMessage || ''}`;
-                    } else if (tipos === 'audio/mp4' || tipos === 'audio/mpeg' || tipos === 'audio/ogg; codecs=opus' || tipos === 'audio/wav' || tipos === 'audio/flac' || tipos === 'audio/webm') {
-                        await kill.sendMessage(monitorID, { audio: upload, mimetype: tipos, ptt: false });
-                        await Indexer('others').sleep(1000); // Intervalo de 1 segundo entre audio, risco de banimento por duplicação no WhatsAp
-                        baileysMessage.text = `*⚠️ ALERTA DO ÁUDIO 🔊*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ ÁUDIO FOI APAGADO E DETECTADO*\n> ${message || captionMessage || ''}`;
-                    } else if (tipos === 'vCard') {
-                    // Extração do nome a partir da vCard
-                        const displayNameMatch = upload.match(/FN:(.*)/); // RegEx para capturar o valor após 'FN:'
-                        const displayName = displayNameMatch ? displayNameMatch[1].trim() : 'Desconhecido';
-
-                        // Extração do número de telefone da vCard
-                        const phoneMatch = upload.match(/TEL;waid=(\d+):(\+?\d+)/); // RegEx para capturar o número de telefone com WhatsApp
-                        const phoneNumber = phoneMatch ? `${phoneMatch[1]}:${phoneMatch[2]}` : 'Número não encontrado';
-                        const vcard = 'BEGIN:VCARD\n'
-                        + 'VERSION:3.0\n'
-                        + `FN:${displayName}\n`
-                        + `ORG:${displayName};\n`
-                        + `TEL;type=CELL;type=VOICE;waid=${phoneNumber}\n`
-                        + 'END:VCARD';
-                        await kill.sendMessage(monitorID, { contacts: { displayName: displayName, contacts: [{ vcard }] } });
-                        await Indexer('others').sleep(1000); // Intervalo de 1 segundo entre audio, risco de banimento por duplicação no WhatsAp
-                        baileysMessage.text = `*⚠️ ALERTA DO CONTATO 🔊*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ CONTATO FOI APAGADO E DETECTADO*\n> ${message || captionMessage || ''}`;
-                    } else if (tiposValidosRegExp.test(tipos)) {
-                        baileysMessage.document = upload;
-                        baileysMessage.mimetype = tipos;
-                        baileysMessage.fileName = doctitle;
-                        baileysMessage.caption = `*⚠️ ALERTA DO DOCUMENTOS 📚*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ DOCUMENTOS FORAM APAGADOS E DETECTADOS*\n> ${message || captionMessage || ''}`;
-                    } else {
-                        baileysMessage.text = `*⚠️ ALERTA DAS MENSAGENS 📝*\n*✪ PL:* ${checkName}\n*✪ GP:* ${name}\n*✪ DDD:* ${user.replace('@s.whatsapp.net', '')}\n*✪ TEMPO:* ${time}\n*✪ MENSAGENS FORAM APAGADAS E DETECTADAS*\n> ${message || captionMessage || ''}`;
-                    }
-                    alertaLog = true;
-                }
+            // Sistema de eventos automáticos atualizado
+            case 'LiveLocationMessage': {
+                // Em breve....
                 break;
             }
-
-            // Sistema de eventos automáticos atualizado
             case 'contactMessage': {
-                addMessage(user, id, body, Msg, 8, false, 'vCard', contactCard, false);
+                addVCard(id, contactCard);
+                addMessage(user, id, message, 'vCard', 8);
                 break;
             }
             case 'documentWithCaptionMessage':
             case 'documentMessage': {
-                addMessage(user, id, '', Msg, 7, false, mimetype, decryptedMedia, FileNameDoc);
+                addDocument(id, recMessage?.fileName, decryptedMediaDelete);
+                addMessage(user, id, message, mimetype, 7);
                 break;
             }
             case 'audioMessage': {
-                addMessage(user, id, body, Msg, 6, false, mimetype, decryptedMedia, false);
-                break;
-            }
-            case 'viewOnceMessageV2':
-            case 'viewOnceMessage': {
-                addMessage(user, id, body, Msg, 5, false, mimetype, decryptedMedia, false);
+                addAudio(id, decryptedMediaDelete, recMessage);
+                addMessage(user, id, message, mimetype, 6);
                 break;
             }
             case 'videoMessage': {
-                addMessage(user, id, body, Msg, 4, false, mimetype, decryptedMedia, false);
+                addVideo(id, decryptedMediaDelete, recMessage);
+                addMessage(user, id, message, mimetype, 4);
                 break;
             }
             case 'stickerMessage': {
-                addMessage(user, id, body, Msg, 3, false, mimetype, decryptedMedia, false);
+                addSticker(id, decryptedMediaDelete, recMessage);
+                addMessage(user, id, message, mimetype, 3);
                 break;
             }
             case 'imageMessage': {
-                addMessage(user, id, body, Msg, 1, false, mimetype, decryptedMedia, false);
+                addImage(id, decryptedMediaDelete, recMessage);
+                addMessage(user, id, message, mimetype, 1);
                 break;
             }
             case 'conversation':
             case 'extendedTextMessage': {
-                addMessage(user, id, body, Msg, false, false, false, false, false, false);
+                if (message.length <= messageText) {
+                    addMessage(user, id, message, 'text/plain', 0);
+                }
                 break;
             }
             }
 
             // Avisa que uma mensagem foi deletada Notificar alerta
             if (alertaLog) {
-                await kill.sendMessage(monitorID, baileysMessage, { quoted: quoteThis });
+                await kill.sendMessage(chatId, baileysMessage, { quoted: quoteThis });
                 alertaLog = false;
             }
         }
