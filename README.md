@@ -54,11 +54,11 @@ Este script utiliza o [Baileys](https://github.com/WhiskeySockets/Baileys) para 
 ### Tipos de Mídia Suportados
 
 - **Mensagens de texto** ✅
-- **Mensagens editadas** ❌
 - **Stickers** ✅
 - **Vídeos** ✅
 - **Documentos** ✅
-- **Visualizações** ❌
+- **Visualizações** ✅
 - **Áudios** ✅
 - **Vcard** ✅
 - **Localização** ❌
+- **Mensagens editadas** ❌
