@@ -191,7 +191,7 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
                     break;
                 }
                 case 3: { // Mensagens de Stickers
-                    await kill.sendMessage(chatId, { sticker: mediaDataDelete?.uploaded, mimetype: mediaDataDelete.mimetype });
+                    await kill.sendMessage(monitorID, { sticker: mediaDataDelete?.uploaded, mimetype: mediaDataDelete.mimetype });
                     await Indexer('others').sleep(1000);
                     baileysMessage.text = '🚨 *ALERTA DE STICKER DELETADO* 🚨\n\n'
                     + '👀 Pegamos no flagra!\n'
@@ -249,7 +249,7 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
                     break;
                 }
                 case 6: { // Mensagens de áudio
-                    await kill.sendMessage(chatId, { audio: mediaDataDelete?.uploaded, mimetype: mediaDataDelete.mimetype });
+                    await kill.sendMessage(monitorID, { audio: mediaDataDelete?.uploaded, mimetype: mediaDataDelete.mimetype });
                     await Indexer('others').sleep(1000);
                     baileysMessage.caption = '🎵 *ÁUDIO DELETADO DETECTADO!* 🎵\n\n'
                     + '🎙️ Tentou mandar aquele áudio e apagar rapidinho? HA! Pegamos! 😂\n\n'
@@ -283,7 +283,7 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
                     break;
                 }
                 case 8: { // Mensagens de vCard
-                    await kill.sendMessage(chatId, { contacts: { contacts: [{ vcard: mediaDataDelete?.data }] } });
+                    await kill.sendMessage(monitorID, { contacts: { contacts: [{ vcard: mediaDataDelete?.data }] } });
                     await Indexer('others').sleep(1000);
                     baileysMessage.text = '👤 *EITA! TENTOU APAGAR UM CONTATO?* 😜\n\n'
                     + '💥 Mal sabia que o *Zap Detetive* estava de olho!\n\n'
@@ -351,7 +351,7 @@ async function deleteRun(kill = envInfo.functions.exec.arguments.kill.value, dat
 
             // Avisa que uma mensagem foi deletada Notificar alerta
             if (alertaLog) {
-                await kill.sendMessage(chatId, baileysMessage, { quoted: quoteThis });
+                await kill.sendMessage(monitorID, baileysMessage, { quoted: quoteThis });
                 alertaLog = false;
             }
         }
